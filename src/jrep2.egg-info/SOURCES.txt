@@ -1,0 +1,14 @@
+LICENSE
+README.md
+pyproject.toml
+setup.cfg
+src/jrep2/__init__.py
+src/jrep2/argparseStuff.py
+src/jrep2/filesystem.py
+src/jrep2/glob.py
+src/jrep2/main.py
+src/jrep2.egg-info/PKG-INFO
+src/jrep2.egg-info/SOURCES.txt
+src/jrep2.egg-info/dependency_links.txt
+src/jrep2.egg-info/entry_points.txt
+src/jrep2.egg-info/top_level.txt

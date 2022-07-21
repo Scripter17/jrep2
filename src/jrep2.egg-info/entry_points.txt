@@ -1,0 +1,2 @@
+[console_scripts]
+jrep2 = jrep2.main:main
