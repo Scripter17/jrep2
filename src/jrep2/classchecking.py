@@ -1,15 +1,12 @@
 import re
-try:
-	import regex
-except ModuleNotFoundError:
-	regex=None
+import regex
 
 def isPattern(x):
 	# Check if x is an instance of re.Pattern or regex.Pattern
-	return isinstance(x, re.Pattern) or (regex is not None and isinstance(x, regex.Pattern))
+	return isinstance(x, re.Pattern) or isinstance(x, regex.Pattern)
 def isMatch(x):
 	# Check if x is an instance of re.Match or regex.Match
-	return isinstance(x, re.Match  ) or (regex is not None and isinstance(x, regex.Match  ))
+	return isinstance(x, re.Match) or isinstance(x, regex.Match)
 def isGenerator(x):
 	# Temp solution
 	# Used in RegexContainer.__getattr__(x) for when re.x/regex.x returns a generator

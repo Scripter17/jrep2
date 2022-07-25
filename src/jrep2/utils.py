@@ -1,16 +1,11 @@
-import argparse, re, dataclasses
-try:
-	import regex
-except ModuleNotFoundError:
-	regex=None
+import argparse, re, fnmatch
+import regex
 from . import classchecking
 
 def isEnhancedEngine(context):
-	ret=isinstance(context, argparse.Namespace) and context.enhanced_engine or\
-		(regex is not None and isinstance(context, regex.Pattern)) or context is True
-	if ret and regex is None:
-		raise ModuleNotFoundError("mrab-regex module not installed; use `pip install regex` to use it")
-	return ret
+	return isinstance(context, argparse.Namespace) and context.enhanced_engine or\
+		isinstance(context, regex.Pattern) or\
+		context is True
 
 def getRegexEngine(context):
 	if isEnhancedEngine(context):
@@ -38,19 +33,6 @@ def reEncode(x, totype):
 		return x.encode()
 	elif type(x)==bytes:
 		return x.decode()
-
-# WHY DID NOBODY TELL ME re.Match.expand WAS A THING
-# def parseSubstitution(repl, matchRegex):
-# 	# regex._compile_replacement_helper(regex.compile(r".(.)."), r"a\1b")
-# 	# ['a', 1, 'b']
-# 	# sre_parse.parse_template(r"a\1b", re.compile(".(.)."))
-# 	# ([(1, 1)], ['a', None, 'b'])
-# 	if isEnhancedEngine(matchRegex):
-# 		return regex.regex._compile_replacement_helper(matchRegex, repl)
-# 	maps, ret=sre_parse.parse_template(repl, matchRegex)
-# 	for index, group in maps:
-# 		ret[index]=group
-# 	return ret
 
 def regexCheckerThing(toCheck, passPatterns, failPatterns, ignorePatterns):
 	"""
@@ -86,14 +68,71 @@ def globCheckerThing(partial, partialPass, partialFail, full="", fullPass=[], fu
 		return True
 	return False
 
-@dataclasses.dataclass
-class RuntimeData:
-	totalFileCount      : int=0
-	totalPassedFileCount: int=0
-	totalFailedFileCount: int=0
-	totalIgnoredFileCount: int=0
+def escape(byteString):
+	ret=byteString.replace(b"\\", b"\\\\")
+	ret=ret.replace(b"\n", b"\\n")
+	ret=ret.replace(b"\r", b"\\r")
+	ret=ret.replace(b"\t", b"\\t")
+	ret=re.sub(b"[\x00-\x1f\x80-\xff]", lambda x:f"\\x{ord(x[0]):02x}".encode(), ret)
+	return ret
 
+class RuntimeData(dict):
+	categories={
+		"total":["dir", "file", "match"],
+		"dir"  :[       "file", "match"],
+		"file" :[               "match"]
+	}
+	parentCategories={
+		"dir"  :["total"               ],
+		"file" :["total", "dir"        ],
+		"match":["total", "dir", "file"]
+	}
+	filters=["processed", "passed", "failed"]
+	def __init__(self, parsedArgs):
+		self.regexCount=len(parsedArgs.regex)
+		for category, subCategories in self.categories.items():
+			self[category]={}
+			for subCategory in subCategories:
+				self[category][subCategory]={}
+				for filter in self.filters:
+					if subCategory=="match":
+						self[category][subCategory][filter]=[0 for _ in range(self.regexCount)]
+					else:
+						self[category][subCategory][filter]=0
+		self["file"]["printedName"]=False
+		self["dir" ]["printedName"]=False
+
+	def new(self, category):
+		self[category]["printedName"]=False
+		for subCategory in self.categories[category]:
+			for filter in self.filters:
+				if subCategory=="match":
+					self[category][subCategory][filter]=[0 for _ in range(self.regexCount)]
+				else:
+					self[category][subCategory][filter]=0
+
+	def count(self, filter, subCategory, regexIndex=None):
+		filters=["processed"] if filter=="ignored" else ["processed", filter]
+		for category in self.parentCategories[subCategory]:
+			for filter in filters:
+				if subCategory=="match":
+					self[category][subCategory][filter][regexIndex]+=1
+				else:
+					self[category][subCategory][filter]+=1
+		if filter=="failed" or filter=="ignored":
+			raise nexts[subCategory]
+
+class NextDir(Exception):
+	pass
 class NextFile(Exception):
 	pass
 class NextMatch(Exception):
 	pass
+nexts={
+	"dir"  :NextDir  ,
+	"file" :NextFile ,
+	"match":NextMatch
+}
+
+def shouldOpenFiles(parsedArgs):
+	return bool(parsedArgs.regex)

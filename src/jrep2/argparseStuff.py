@@ -1,4 +1,4 @@
-import argparse, sys, re
+import argparse, sys, re, string, os, shutil
 from . import glob, utils, containers
 
 enhancedEngineDetector=re.compile(r"^-[a-zA-Z]*E|^--enhanced-engine$").match
@@ -19,7 +19,13 @@ class GlobsAction(argparse.Action):
 	def __call__(self, parser, namespace, values, option_string):
 		if not hasattr(namespace, "globs") or namespace.globs is None:
 			namespace.globs=[]
-		namespace.globs.extend(values)
+		for value in values:
+			if value[0:2] in ("*:", "?:"):
+				for letter in string.ascii_uppercase:
+					if os.path.exists(f"{letter}:/"):
+						namespace.globs.append(letter+value[1:])
+			else:
+				namespace.globs.append(value)
 
 def compileRegexes(regexes, namespace):
 	return [containers.RegexContainer(pattern, namespace) for pattern in regexes]
@@ -75,18 +81,19 @@ class SubRegexAction(argparse.Action):
 		for regexGroup in utils.listSplit(values, "*"):
 			ret.append([])
 			for subSets in utils.listSplit(regexGroup, "+"):
-				parsed={"tests":[], "antiTests":[], "patterns":[], "repls":[]}
+				parsed={"tests":[], "antiTests":[], "patterns":[], "replsStr":[], "replsBytes":[]}
 				thingParts=utils.listSplit(subSets, "?")
 				if   len(thingParts)==1: thingParts=[[],            [], thingParts[0]]
 				elif len(thingParts)==2: thingParts=[thingParts[0], [], thingParts[1]]
-				parsed["tests"    ]=compileRegexes(thingParts[0]      , namespace)
-				parsed["antiTests"]=compileRegexes(thingParts[1]      , namespace)
-				parsed["patterns" ]=compileRegexes(thingParts[2][0::2], namespace) # Even elems
-				parsed["repls"    ]=[utils.reEncode(x, bytes) for x in thingParts[2][1::2]] # Odd  elems
+				parsed["tests"     ]=compileRegexes(thingParts[0]      , namespace)
+				parsed["antiTests" ]=compileRegexes(thingParts[1]      , namespace)
+				parsed["patterns"  ]=compileRegexes(thingParts[2][0::2], namespace) # Even elems
+				parsed["replsStr"  ]=[utils.reEncode(x, str  ) for x in thingParts[2][1::2]] # Odd  elems
+				parsed["replsBytes"]=[utils.reEncode(x, bytes) for x in thingParts[2][1::2]] # Odd  elems
 				ret[-1].append(parsed)
 		setattr(namespace, self.dest, ret)
 
-class DictableParser(argparse.ArgumentParser):
+class CustomParser(argparse.ArgumentParser):
 	def parse_args(self, args=None, namespace=None):
 		if args is None:
 			args=sys.argv[1:]
@@ -96,16 +103,84 @@ class DictableParser(argparse.ArgumentParser):
 			namespace.enhanced_engine=True
 		return super().parse_args(args, namespace)
 
-parser=DictableParser()
-parser.add_argument("regex", nargs="+", action=RegexListAction)
-parser.add_argument("--enhanced-engine", "-E", action="store_true")
+class CustomHelpFormatter(argparse.HelpFormatter):
+	"""
+		Allows --help to better fit the console and adds support for blank lines
+	"""
+	def __init__(self, prog, indent_increment=2, max_help_position=24, width=None):
+		argparse.HelpFormatter.__init__(self, prog, indent_increment, shutil.get_terminal_size().columns, width)
 
-parser.add_argument("--files", "-f", nargs="+", action=FilesAction)
-parser.add_argument("--globs", "-g", nargs="+", action=GlobsAction)
+	def _split_lines(self, text, width):
+		lines = super()._split_lines(text, width)
+		if "\n" in text:
+			lines += text.split("\n")[1:]
+			text = text.split("\n")[0]
+		return lines
 
-parser.add_argument("--sub", "-R", nargs="+", action=SubRegexAction)
-parser.add_argument("--replace", "-r", nargs="+")
+	def _format_action_invocation(self, action):
+		if not action.option_strings:
+			default = self._get_default_metavar_for_positional(action)
+			metavar, = self._metavar_formatter(action, default)(1)
+			return metavar
+		else:
+			ret=", ".join(action.option_strings).ljust(30, " ")
+			if action.nargs!=0:
+				ret+=self._format_args(action, self._get_default_metavar_for_optional(action))
+			return ret
 
-parser.add_argument("--match-regex", nargs="+", action=RegexListAction, default=[])
-parser.add_argument("--match-anti-regex", nargs="+", action=RegexListAction, default=[])
-parser.add_argument("--match-ignore-regex", nargs="+", action=RegexListAction, default=[])
+parser=CustomParser(formatter_class=CustomHelpFormatter, description="""
+	A modern GREP-like command line tool for processing files via regex
+""")
+parser.add_argument("regex"                   ,       nargs="*", action=RegexListAction            )
+parser.add_argument("--enhanced-engine"       , "-E"           , action="store_true"               , help="Use the mrab-regex module instead of the bultin one (https://github.com/mrabarnett/mrab-regex)")
+
+group=parser.add_argument_group("File selection", "`-f a.txt -g *.jpg -f b.txt` will handle the files in that order")
+group .add_argument("--files"                 , "-f", nargs="+", action=FilesAction                )
+group .add_argument("--globs"                 , "-g", nargs="+", action=GlobsAction                )
+
+group=parser.add_argument_group("Output settings")
+group .add_argument("--print-dir-names"       , "-d"           , action="store_true"               )
+group .add_argument("--print-file-names"      , "-n"           , action="store_true"               )
+group .add_argument("--print-full-paths"      , "-p"           , action="store_true"               , help="Affects --name-sub and co. too")
+group .add_argument("--no-print-matches"      , "-N"           , action="store_true"               )
+group .add_argument("--escape-match-output"   , "-e"           , action="store_true"               , help="Replace tabs, newlines, and carriage returns with \\t, \\n, and \\r. Also replace 0x00-0x1f and 0x80-0xff bytes with \\xHH")
+
+group=parser.add_argument_group("Modify match")
+group .add_argument("--replace"               , "-r", nargs="+"                                    , help="Reformat match using normal re.sub syntax (`jrep (.) -r \\1\\1` doubles each char)")
+group .add_argument("--sub"                   , "-R", nargs="+", action=SubRegexAction             , help="Apply regex subsitutions to the match. See substitution syntax below")
+
+group=parser.add_argument_group("File path subsitution")
+group .add_argument("--file-name-sub"         ,       nargs="+", action=SubRegexAction             )
+group .add_argument("--dir-path-sub"          ,       nargs="+", action=SubRegexAction             )
+group .add_argument("--full-path-sub"         ,       nargs="+", action=SubRegexAction             )
+
+group=parser.add_argument_group("File path validator regexes")
+group .add_argument("--file-name-regex"       ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-anti-regex"  ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-ignore-regex",       nargs="+", action=RegexListAction, default=[])
+
+group .add_argument("--dir-path-regex"        ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-anti-regex"   ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-ignore-regex" ,       nargs="+", action=RegexListAction, default=[])
+
+group .add_argument("--full-path-regex"       ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-anti-regex"  ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-ignore-regex",       nargs="+", action=RegexListAction, default=[])
+
+group=parser.add_argument_group("File path validator globs")
+group .add_argument("--file-name-glob"        ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-anti-glob"   ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-ignore-glob" ,       nargs="+", action=RegexListAction, default=[])
+
+group .add_argument("--dir-path-glob"         ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-anti-glob"    ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-ignore-glob"  ,       nargs="+", action=RegexListAction, default=[])
+
+group .add_argument("--full-path-glob"        ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-anti-glob"   ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-ignore-glob" ,       nargs="+", action=RegexListAction, default=[])
+
+group=parser.add_argument_group("Match validator regexes")
+group .add_argument("--match-regex"           ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--match-anti-regex"      ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--match-ignore-regex"    ,       nargs="+", action=RegexListAction, default=[])
