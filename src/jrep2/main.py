@@ -7,12 +7,39 @@ def main(args=None):
 	runtimeData=utils.RuntimeData(parsedArgs)
 
 	funcs={**processors.funcs}
-	if not parsedArgs.replace         : del funcs["replace"        ]
-	if not parsedArgs.sub             : del funcs["sub"            ]
+	if not parsedArgs.file_validator  : del funcs["file-validator" ]
+
 	if not parsedArgs.file_name_sub   : del funcs["file-name-sub"  ]
 	if not parsedArgs.dir_path_sub    : del funcs["dir-path-sub"   ]
 	if not parsedArgs.full_path_sub   : del funcs["full-path-sub"  ]
+
+	if not parsedArgs.file_name_glob and\
+			not parsedArgs.file_name_anti_glob and\
+			not parsedArgs.file_name_ignore_glob and\
+			not parsedArgs.file_name_regex and\
+			not parsedArgs.file_name_anti_regex and\
+			not parsedArgs.file_name_ignore_regex:
+		del funcs["file-name-regex"]
+	if not parsedArgs.dir_path_glob  and\
+			not parsedArgs.dir_path_anti_glob  and\
+			not parsedArgs.dir_path_ignore_glob  and\
+			not parsedArgs.dir_path_regex  and\
+			not parsedArgs.dir_path_anti_regex  and\
+			not parsedArgs.dir_path_ignore_regex :
+		del funcs["dir-path-regex"]
+	if not parsedArgs.full_path_glob and\
+			not parsedArgs.full_path_anti_glob and\
+			not parsedArgs.full_path_ignore_glob and\
+			not parsedArgs.full_path_regex and\
+			not parsedArgs.full_path_anti_regex and\
+			not parsedArgs.full_path_ignore_regex:
+		del funcs["full-path-regex"]
+
+	if not parsedArgs.replace         : del funcs["replace"        ]
+	if not parsedArgs.sub             : del funcs["sub"            ]
+
 	if not parsedArgs.match_regex     : del funcs["match-regex"    ]
+
 	if not parsedArgs.print_dir_names : del funcs["print-dir-name" ]
 	if not parsedArgs.print_file_names: del funcs["print-file-name"]
 	if     parsedArgs.no_print_matches or not parsedArgs.regex:

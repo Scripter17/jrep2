@@ -131,6 +131,11 @@ def printMatch(parsedArgs, runtimeData, match, **kwargs):
 		sys.stdout.buffer.write(match[0])
 	sys.stdout.buffer.write(b"\n")
 
+def fileValidator(parsedArgs, file, **kwargs):
+	from . import filtering
+	if not all(map(lambda validator: filtering.evaluateFilter(validator, file.stat()), parsedArgs.file_validator)):
+		raise utils.NextFile
+
 # funcs={
 # 	"replace"                 : funcReplace,
 # 	"match-whole-lines"       : funcMatchWholeLines,
@@ -145,6 +150,8 @@ def printMatch(parsedArgs, runtimeData, match, **kwargs):
 # }
 
 funcs={
+	"file-validator" : fileValidator,
+
 	"file-name-sub"  : fileNameSub,
 	"dir-path-sub"   : dirPathSub,
 	"full-path-sub"  : fullPathSub,
@@ -155,7 +162,9 @@ funcs={
 
 	"replace"        : replace,
 	"sub"            : sub,
+
 	"match-regex"    : matchRegex,
+
 	"print-dir-name" : printDirName,
 	"print-file-name": printFileName,
 	"print-match"    : printMatch,

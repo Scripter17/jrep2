@@ -184,3 +184,6 @@ group=parser.add_argument_group("Match validator regexes")
 group .add_argument("--match-regex"           ,       nargs="+", action=RegexListAction, default=[])
 group .add_argument("--match-anti-regex"      ,       nargs="+", action=RegexListAction, default=[])
 group .add_argument("--match-ignore-regex"    ,       nargs="+", action=RegexListAction, default=[])
+
+group=parser.add_argument_group("File path validator expressions")
+group .add_argument("--file-validator"        ,       nargs="+"                        , default=[], help="Python expression(s); All must return truthy values for file to be processed")
