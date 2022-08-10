@@ -129,6 +129,7 @@ def printFileName(parsedArgs, runtimeData, file, stdout, **kwargs):
 		stdout.write(b"\n")
 
 def printMatch(parsedArgs, runtimeData, match, stdout, **kwargs):
+	stdout.write(b"match: ")
 	if parsedArgs.escape_match_output:
 		stdout.write(utils.escape(match[0]))
 	else:
