@@ -1,4 +1,4 @@
-import argparse, re, fnmatch
+import argparse, re, fnmatch, functools
 import regex
 from . import classchecking
 
@@ -42,9 +42,9 @@ def regexCheckerThing(toCheck, passPatterns, failPatterns, ignorePatterns):
 	"""
 	if ignorePatterns and any(map(lambda x:x.search(toCheck), ignorePatterns)):
 		return None
-	if failPatterns and any(map(lambda x:x.search(toCheck), failPatterns)):
+	elif failPatterns and any(map(lambda x:x.search(toCheck), failPatterns)):
 		return False
-	if all(map(lambda x:x.search(toCheck), passPatterns)):
+	elif all(map(lambda x:x.search(toCheck), passPatterns)):
 		return True
 	return False
 
@@ -88,6 +88,7 @@ class RuntimeData(dict):
 		"match":["total", "dir", "file"]
 	}
 	filters=["processed", "passed", "failed"]
+
 	def __init__(self, parsedArgs):
 		self.regexCount=len(parsedArgs.regex)
 		for category, subCategories in self.categories.items():
@@ -101,6 +102,27 @@ class RuntimeData(dict):
 						self[category][subCategory][filter]=0
 		self["file"]["printedName"]=False
 		self["dir" ]["printedName"]=False
+
+	@classmethod
+	def flatDictKeys(cls):
+		ret=[]
+		for category, subCategories in cls.categories.items():
+			for subCategory in subCategories:
+				for filter in cls.filters:
+					ret.append(f"{category}{filter.title()}{subCategory.title()}")
+		ret.append("printedFileName")
+		ret.append("printedDirName" )
+		return ret
+
+	def asFlatDict(self):
+		ret={}
+		for category, subCategories in self.categories.items():
+			for subCategory in subCategories:
+				for filter in self.filters:
+					ret[f"{category}{filter.title()}{subCategory.title()}"]=self[category][subCategory][filter]
+		ret["printedFileName"]=self["file"]["printedName"]
+		ret["printedDirName" ]=self["dir" ]["printedName"]
+		return ret
 
 	def new(self, category):
 		self[category]["printedName"]=False
@@ -128,6 +150,7 @@ class NextFile(Exception):
 	pass
 class NextMatch(Exception):
 	pass
+
 nexts={
 	"dir"  :NextDir  ,
 	"file" :NextFile ,

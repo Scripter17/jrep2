@@ -1,5 +1,5 @@
 import datetime as _datetime
-import re, ast, functools
+import re, ast, functools, os
 
 class NormalizationHelper:
 	normalizer=None
@@ -29,20 +29,32 @@ class datetime(NormalizationHelper, _datetime.datetime):
 		return x
 
 attrGrabber=re.compile(r"\w+(?==)")
-def evaluateFilter(expr, stat):
-	globalDict={x.removeprefix("st_"):getattr(stat, x) for x in attrGrabber.findall(stat.__repr__())}
-	globalDict["time"    ]=time
-	globalDict["date"    ]=date
-	globalDict["datetime"]=datetime
-	if validateExpr(expr):
+def getFileDict(file):
+	stat=file.stat()
+	ret={x.removeprefix("st_"):getattr(stat, x) for x in attrGrabber.findall(stat.__repr__())}
+	ret["time"    ]=time
+	ret["date"    ]=date
+	ret["datetime"]=datetime
+	ret["path"    ]=file.as_posix(),
+	ret["abspath" ]=file.resolve(),
+	ret["normpath"]=os.path.normpath(file),
+	ret["filename"]=file.parts[-1],
+	ret["dir"     ]=file.parents[0].as_posix(),
+	ret["absdir"  ]=file.parents[0].resolve(),
+	ret["normdir" ]=os.path.normpath(file.parents[0]),
+	return ret
+
+badVars=(r"_.*", "globals", "locals", "open", "eval", "exec", "exit", "quit", "compile")
+exprFlagger=re.compile(rf"\b({'|'.join(badVars)})\b")
+exprUnvalidator=lambda x: isinstance(x, ast.Name) and x.id in badVars
+@functools.lru_cache(maxsize=None) # functools.cache isn't in 3.6
+def validateExpr(expr):
+	return not (exprFlagger.search(expr) and any(map(exprUnvalidator, ast.walk(ast.parse(expr)))))
+
+def evaluateExpr(parsedArgs, expr, globalDict):
+	if parsedArgs.unsafe_expr or validateExpr(expr):
 		return eval(expr, globalDict)
 	raise ValueError(f"Expression contains potentially unsafe code: {expr}")
-
-exprUnvalidator=re.compile(r"\b(__builtins__|globals)\b")
-exprProperUnvalidator=lambda x: isinstance(x, ast.Name) and (x.id=="__builtins__" or x.id=="globals")
-@functools.lru_cache(maxsize=None)
-def validateExpr(expr):
-	return not (exprUnvalidator.search(expr) and any(map(exprProperUnvalidator, ast.walk(ast.parse(expr)))))
 
 if __name__=="__main__":
 	import os

@@ -63,8 +63,8 @@ class RegexListAction(argparse.Action):
 # 	compileFunc=compileRegexes
 
 # class GlobTestsAction(TestsAction):
-# 	ruleSetSplit=None
-# 	rulePartSplit=None
+# 	ruleSetSplit=???
+# 	rulePartSplit=???
 # 	compileFunc=compileGlobs
 
 class SubRegexAction(argparse.Action):
@@ -131,59 +131,75 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 parser=CustomParser(formatter_class=CustomHelpFormatter, description="""
 	A modern GREP-like command line tool for processing files via regex
 """)
-parser.add_argument("regex"                   ,       nargs="*", action=RegexListAction            )
-parser.add_argument("--enhanced-engine"       , "-E"           , action="store_true"               , help="Use the mrab-regex module instead of the bultin one (https://github.com/mrabarnett/mrab-regex)")
+parser.add_argument("regex"                    ,       nargs="*", action=RegexListAction            )
+parser.add_argument("--enhanced-engine"        , "-E"           , action="store_true"               , help="Use the mrab-regex module instead of the bultin one (https://github.com/mrabarnett/mrab-regex)")
+parser.add_argument("--no-cmd"                 ,                  action="store_true"               , help="Disables all CMD functionality for safety")
+parser.add_argument("--no-expr"                ,                  action="store_true"               , help="Disables all expr functionality for safety")
+parser.add_argument("--unsafe-expr"            ,                  action="store_true"               , help="[NOT RECCOMMENDED] Allows usage of unsafe globals in expressions (open, exit, exec, etc.)")
 
 group=parser.add_argument_group("File selection", "`-f a.txt -g *.jpg -f b.txt` will handle the files in that order")
-group .add_argument("--files"                 , "-f", nargs="+", action=FilesAction                )
-group .add_argument("--globs"                 , "-g", nargs="+", action=GlobsAction                )
+group .add_argument("--files"                  , "-f", nargs="+", action=FilesAction                )
+group .add_argument("--globs"                  , "-g", nargs="+", action=GlobsAction    , default=[])
 
 group=parser.add_argument_group("Output settings")
-group .add_argument("--print-dir-names"       , "-d"           , action="store_true"               )
-group .add_argument("--print-file-names"      , "-n"           , action="store_true"               )
-group .add_argument("--print-full-paths"      , "-p"           , action="store_true"               , help="Affects --name-sub and co. too")
-group .add_argument("--no-print-matches"      , "-N"           , action="store_true"               )
-group .add_argument("--escape-match-output"   , "-e"           , action="store_true"               , help="Replace tabs, newlines, and carriage returns with \\t, \\n, and \\r. Also replace 0x00-0x1f and 0x80-0xff bytes with \\xHH")
+group .add_argument("--print-dir-names"        , "-d"           , action="store_true"               )
+group .add_argument("--print-file-names"       , "-n"           , action="store_true"               )
+group .add_argument("--print-full-paths"       , "-p"           , action="store_true"               , help="Affects --name-sub and co. too")
+group .add_argument("--no-print-matches"       , "-N"           , action="store_true"               )
+group .add_argument("--escape-match-output"    , "-e"           , action="store_true"               , help="Replace tabs, newlines, and carriage returns with \\t, \\n, and \\r. Also replace 0x00-0x1f and 0x80-0xff bytes with \\xHH")
 
 group=parser.add_argument_group("Modify match")
-group .add_argument("--replace"               , "-r", nargs="+"                                    , help="Reformat match using normal re.sub syntax (`jrep (.) -r \\1\\1` doubles each char)")
-group .add_argument("--sub"                   , "-R", nargs="+", action=SubRegexAction             , help="Apply regex subsitutions to the match. See substitution syntax below")
+group .add_argument("--replace"                , "-r", nargs="+"                                    , help="Reformat match using normal re.sub syntax (`jrep (.) -r \\1\\1` doubles each char)")
+group .add_argument("--sub"                    , "-R", nargs="+", action=SubRegexAction             , help="Apply regex subsitutions to the match. See substitution syntax below")
 
 group=parser.add_argument_group("File path subsitution")
-group .add_argument("--file-name-sub"         ,       nargs="+", action=SubRegexAction             )
-group .add_argument("--dir-path-sub"          ,       nargs="+", action=SubRegexAction             )
-group .add_argument("--full-path-sub"         ,       nargs="+", action=SubRegexAction             )
+group .add_argument("--file-name-sub"          ,       nargs="+", action=SubRegexAction             )
+group .add_argument("--dir-path-sub"           ,       nargs="+", action=SubRegexAction             )
+group .add_argument("--full-path-sub"          ,       nargs="+", action=SubRegexAction             )
 
 group=parser.add_argument_group("File path validator regexes")
-group .add_argument("--file-name-regex"       ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--file-name-anti-regex"  ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--file-name-ignore-regex",       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-regex"        ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-anti-regex"   ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-ignore-regex" ,       nargs="+", action=RegexListAction, default=[])
 
-group .add_argument("--dir-path-regex"        ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--dir-path-anti-regex"   ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--dir-path-ignore-regex" ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-regex"         ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-anti-regex"    ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-ignore-regex"  ,       nargs="+", action=RegexListAction, default=[])
 
-group .add_argument("--full-path-regex"       ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--full-path-anti-regex"  ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--full-path-ignore-regex",       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-regex"        ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-anti-regex"   ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-ignore-regex" ,       nargs="+", action=RegexListAction, default=[])
 
 group=parser.add_argument_group("File path validator globs")
-group .add_argument("--file-name-glob"        ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--file-name-anti-glob"   ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--file-name-ignore-glob" ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-glob"         ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-anti-glob"    ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--file-name-ignore-glob"  ,       nargs="+", action=RegexListAction, default=[])
 
-group .add_argument("--dir-path-glob"         ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--dir-path-anti-glob"    ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--dir-path-ignore-glob"  ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-glob"          ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-anti-glob"     ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--dir-path-ignore-glob"   ,       nargs="+", action=RegexListAction, default=[])
 
-group .add_argument("--full-path-glob"        ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--full-path-anti-glob"   ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--full-path-ignore-glob" ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-glob"         ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-anti-glob"    ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--full-path-ignore-glob"  ,       nargs="+", action=RegexListAction, default=[])
 
 group=parser.add_argument_group("Match validator regexes")
-group .add_argument("--match-regex"           ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--match-anti-regex"      ,       nargs="+", action=RegexListAction, default=[])
-group .add_argument("--match-ignore-regex"    ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--match-regex"            ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--match-anti-regex"       ,       nargs="+", action=RegexListAction, default=[])
+group .add_argument("--match-ignore-regex"     ,       nargs="+", action=RegexListAction, default=[])
 
-group=parser.add_argument_group("File path validator expressions")
-group .add_argument("--file-validator"        ,       nargs="+"                        , default=[], help="Python expression(s); All must return truthy values for file to be processed")
+group=parser.add_argument_group("File validator expressions")
+group .add_argument("--file-validator-expr"                                                         , help="Python expression that must return truthy for the file to be processed. Uses os.stat(file) results as well as time, date, and datetime from the datetime builtin library modded to support comparing with ints/floats. Example: `ctime<date(2020,01,01)`")
+group .add_argument("--file-validator-cmd"     ,       nargs="+"                                    , help="Command line command(s) whose stdout, stderr, and return code are passed to --file-validator-expr. Use {path} {abspath} {normpath} {filename} {dir} {absdir} and {normdir} to substitute the respective values")
+group .add_argument("--file-validator-cmd-expr",       nargs="+"                                    , help="--file-validator but the nth expression uses the output of the nth --file-validator-cmd. Uses command stdout, stderr, and returncode. Examples: `returncode==0`, `returncode!=0`, `stderr==''`")
+
+group=parser.add_argument_group("Pre/Post printing cmds")
+group .add_argument("--pre-dir-name-cmd"       ,       nargs="+"                                    , help="Execute each command before printing dir names")
+group .add_argument("--post-dir-name-cmd"      ,       nargs="+"                                    , help="Execute each command after  printing dir names")
+group .add_argument("--pre-file-name-cmd"      ,       nargs="+"                                    , help="Execute each command before printing file names")
+group .add_argument("--post-file-name-cmd"     ,       nargs="+"                                    , help="Execute each command after  printing file names")
+group .add_argument("--pre-match-cmd"          ,       nargs="+"                                    , help="Execute each command before printing matches")
+group .add_argument("--post-match-cmd"         ,       nargs="+"                                    , help="Execute each command after  printing matches")
+
+group=parser.add_argument_group("Miscellaneous")
+group .add_argument("--skip-conditions"        ,       nargs="+"                                    , help=f"`file={{python expression}}` skips the file when the expression is truthy. Same with `dir=` and `match=`. Variables are {', '.join(utils.RuntimeData.flatDictKeys())}")
