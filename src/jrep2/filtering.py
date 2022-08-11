@@ -3,26 +3,29 @@ import re, ast, functools, os
 
 class NormalizationHelper:
 	normalizer=None
-	def __lt__(self, other): return super().__lt__(self.__class__.normalizer(other))
-	def __le__(self, other): return super().__le__(self.__class__.normalizer(other))
-	def __eq__(self, other): return super().__eq__(self.__class__.normalizer(other))
-	def __ge__(self, other): return super().__ge__(self.__class__.normalizer(other))
-	def __gt__(self, other): return super().__gt__(self.__class__.normalizer(other))
-	def __ne__(self, other): return super().__ne__(self.__class__.normalizer(other))
+	def __lt__(self, other): return super().__lt__(self.normalizer(other))
+	def __le__(self, other): return super().__le__(self.normalizer(other))
+	def __eq__(self, other): return super().__eq__(self.normalizer(other))
+	def __ge__(self, other): return super().__ge__(self.normalizer(other))
+	def __gt__(self, other): return super().__gt__(self.normalizer(other))
+	def __ne__(self, other): return super().__ne__(self.normalizer(other))
 
 class time(NormalizationHelper, _datetime.time):
+	@staticmethod
 	def normalizer(x):
 		if isinstance(x, int) or isinstance(x, float):
 			return _datetime.datetime.fromtimestamp(x).time()
 		return x
 
 class date(NormalizationHelper, _datetime.date):
+	@staticmethod
 	def normalizer(x):
 		if isinstance(x, int) or isinstance(x, float):
 			return _datetime.datetime.fromtimestamp(x).date()
 		return x
 
 class datetime(NormalizationHelper, _datetime.datetime):
+	@staticmethod
 	def normalizer(x):
 		if isinstance(x, int) or isinstance(x, float):
 			return _datetime.datetime.fromtimestamp(x)

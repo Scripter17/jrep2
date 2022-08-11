@@ -40,41 +40,21 @@ def regexCheckerThing(toCheck, passPatterns, failPatterns, ignorePatterns):
 		False = Failed
 		None  = Ignored
 	"""
-	if ignorePatterns and any(map(lambda x:x.search(toCheck), ignorePatterns)):
-		return None
-	elif failPatterns and any(map(lambda x:x.search(toCheck), failPatterns)):
-		return False
-	elif all(map(lambda x:x.search(toCheck), passPatterns)):
-		return True
-	return False
-
-def globCheckerThing(partial, partialPass, partialFail, full="", fullPass=[], fullFail=[], partialIgnore=[], fullIgnore=[]):
-	"""
-		partial=Desktop/Whatever
-		full   =C:/Users/You/Desktop/Whatever
-
-		True  = Passed
-		False = Failed
-		None  = Ignored
-	"""
-	if any(map(lambda x:fnmatch.fnmatch(partial, x), partialIgnore)) or\
-	   any(map(lambda x:fnmatch.fnmatch(full   , x), fullIgnore   )):
-		return None
-	if any(map(lambda x:fnmatch.fnmatch(partial, x), partialFail)) or\
-	   any(map(lambda x:fnmatch.fnmatch(full   , x), fullFail   )):
-		return False
-	if all(map(lambda x:fnmatch.fnmatch(partial, x), partialPass)) and\
-	   all(map(lambda x:fnmatch.fnmatch(full   , x), fullPass   )):
-		return True
+	if   any(map(lambda x:x.search(toCheck), ignorePatterns)): return None
+	elif any(map(lambda x:x.search(toCheck), failPatterns  )): return False
+	elif all(map(lambda x:x.search(toCheck), passPatterns  )): return True
 	return False
 
 def escape(byteString):
-	ret=byteString.replace(b"\\", b"\\\\")
-	ret=ret.replace(b"\n", b"\\n")
-	ret=ret.replace(b"\r", b"\\r")
-	ret=ret.replace(b"\t", b"\\t")
-	ret=re.sub(b"[\x00-\x1f\x80-\xff]", lambda x:f"\\x{ord(x[0]):02x}".encode(), ret)
-	return ret
+	return re.sub(
+		b"[\x00-\x1f\x80-\xff]",
+		lambda x:f"\\x{ord(x[0]):02x}".encode(),
+		byteString
+			.replace(b"\\", b"\\\\")
+			.replace(b"\n", b"\\n")
+			.replace(b"\r", b"\\r")
+			.replace(b"\t", b"\\t")
+	)
 
 class RuntimeData(dict):
 	categories={
@@ -91,6 +71,7 @@ class RuntimeData(dict):
 
 	def __init__(self, parsedArgs):
 		self.regexCount=len(parsedArgs.regex)
+		self.parsedArgs=parsedArgs # Bad practice I know
 		for category, subCategories in self.categories.items():
 			self[category]={}
 			for subCategory in subCategories:
@@ -100,8 +81,19 @@ class RuntimeData(dict):
 						self[category][subCategory][filter]=[0 for _ in range(self.regexCount)]
 					else:
 						self[category][subCategory][filter]=0
-		self["file"]["printedName"]=False
-		self["dir" ]["printedName"]=False
+		self["file"  ]["printedName"]=False
+		self["dir"   ]["printedName"]=False
+
+		self.initDedupe()
+
+	def initDedupe(self):
+		self.initMatchDedupe()
+
+	def initMatchDedupe(self):
+		if "per-regex" in self.parsedArgs.no_duplicate_matches:
+			self["dedupe"]={"match":[[] for _ in range(self.regexCount)]}
+		else:
+			self["dedupe"]={"match":[]}
 
 	@classmethod
 	def flatDictKeys(cls):
@@ -132,6 +124,8 @@ class RuntimeData(dict):
 					self[category][subCategory][filter]=[0 for _ in range(self.regexCount)]
 				else:
 					self[category][subCategory][filter]=0
+		if f"per-{category}" in self.parsedArgs.no_duplicate_matches:
+			self.initMatchDedupe()
 
 	def count(self, filter, subCategory, regexIndex=None):
 		filters=["processed"] if filter=="ignored" else ["processed", filter]
